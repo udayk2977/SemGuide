@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 
 class SubjectNameSerializer(serializers.Serializer):
+    
     name = serializers.CharField(max_length=100)
 
 class SubjectNameToIDSerializer(serializers.Serializer):
