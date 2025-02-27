@@ -137,7 +137,7 @@ class LoginAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 class APILogoutView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         if self.request.data.get('all'):
@@ -182,6 +182,10 @@ def my_api_view(request):
 
 class UserUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
+
+    def get(self, request):
+        return Response({"message": " within the request limit!"})
     serializer_class = UserUpdateSerializer
 
     def put(self, request, *args, **kwargs):
