@@ -51,20 +51,18 @@ function UserProfile({ user, onChange }) {
     setConfirmPassword(e.target.value);
   };
 
- const handleSavePassword = () => {
+  const handleSavePassword = () => {
     if (newPassword !== confirmPassword) {
       setError('New password and confirm password do not match.');
       return;
     }
-    const auth_token = localStorage.getItem('atoken'); 
-    console.log(auth_token)
+  
     fetch('https://semguide-zbku.onrender.com/api/id', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        // eslint-disable-next-line no-undef
-        Authorization: `Bearer ${auth_token}`
       },
+      credentials: 'include', 
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: newPassword,
@@ -75,19 +73,22 @@ function UserProfile({ user, onChange }) {
         if (!response.ok) {
           throw new Error('Failed to update password');
         }
-        // Update password in the state or trigger any necessary actions
+        return response.json();
+      })
+      .then((data) => {
+        console.log('Password updated successfully:', data);
         onChange('password', newPassword);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setError('');
-        console.log('Password updated successfully');
       })
-      .catch((fetchError) => { // Renamed to 'fetchError' to avoid conflict
-        console.error('Error updating password:', fetchError);
+      .catch((error) => {
+        console.error('Error updating password:', error);
         setError('Failed to update password. Please try again later.');
       });
   };
+  
   return (
     <Stack spacing={2}>
       <Grid container spacing={4}>

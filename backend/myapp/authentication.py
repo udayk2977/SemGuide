@@ -8,7 +8,7 @@ class JWTAuthenticationFromCookie(BaseAuthentication):
         access_token = request.COOKIES.get("access_token")
 
         if not access_token:
-            return None  # No token found, return anonymous user
+            return None  
 
         try:
             token = AccessToken(access_token)

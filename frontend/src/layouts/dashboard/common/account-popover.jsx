@@ -53,27 +53,32 @@ export default function AccountPopover() {
     window.location.reload();
     const refreshToken = localStorage.getItem('token'); // Assuming the refresh token is stored as 'token' in local storage
 
-    try {
-      const response = await fetch('https://semguide-zbku.onrender.com/logout/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+    const handleLogout = async () => {
+      try {
+        const response = await fetch('https://semguide-zbku.onrender.com/logout/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Ensures cookies are sent with the request
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+    
+        if (response.ok) {
 
-      if (response.ok) {
-        localStorage.removeItem('token');
-        console.log('successfully logged out');
-        navigate('/');
-        handleClose();
-      } else {
-        console.error('Logout failed:', response.statusText);
+    
+          console.log('Successfully logged out');
+          navigate('/'); 
+          handleClose(); 
+        } else {
+          const errorMessage = await response.text(); 
+          console.error('Logout failed:', errorMessage);
+        }
+      } catch (error) {
+        console.error('Logout error:', error.message);
       }
-    } catch (error) {
-      console.error('Logout error:', error.message);
-    }
-  };
+    }};
+    
 
   return (
     <>
