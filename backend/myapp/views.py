@@ -1,43 +1,34 @@
-from rest_framework.generics import CreateAPIView,GenericAPIView,ListAPIView
-from rest_framework.response import Response
-from rest_framework import status,generics
-from .models import User,Feedback,LoginSession,BlacklistedToken
-from .serializers import UserSerializer,LoginSerializer,FeedbackSerializer, UserUpdateSerializer,UserprofileSerializer
-from rest_framework.permissions import AllowAny,IsAuthenticated
-from rest_framework.decorators import permission_classes,api_view
-from rest_framework.views import APIView
-from rest_framework.mixins import CreateModelMixin
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-import json
-from rest_framework_simplejwt.tokens import AccessToken,RefreshToken
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 import jwt
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.core.exceptions import ObjectDoesNotExist  
-from rest_framework_simplejwt.tokens import OutstandingToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password
-from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ObjectDoesNotExist  
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
 from rest_framework import generics, status
+from rest_framework.generics import CreateAPIView
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.mixins import CreateModelMixin
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import generics
-from .models import Semester, Subject, Document, Link
-from .serializers import SubjectSerializer, DocumentSerializer, LinkSerializer
-from rest_framework import generics
-from .models import Semester, Subject, Document, Link
-from .serializers import SemesterSerializer, SubjectSerializer, DocumentSerializer, LinkSerializer
-from rest_framework import generics
-from .models import Subject, Document, Link
-from .serializers import SubjectSerializer, DocumentSerializer, LinkSerializer
-from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework import status
-from .models import Subject
-from .serializers import SubjectSerializer, SubjectNameSerializer
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+
+from .models import (
+    User, Feedback, LoginSession, Semester, Subject, Document, Link
+)
+from .serializers import (
+    UserSerializer, LoginSerializer, FeedbackSerializer, 
+    UserUpdateSerializer, UserprofileSerializer, 
+    SemesterSerializer, SubjectSerializer, DocumentSerializer, 
+    LinkSerializer, SubjectNameSerializer
+)
+
 
 class GetSubjectIDByName(generics.CreateAPIView):
     serializer_class = SubjectNameSerializer
@@ -118,6 +109,7 @@ class CreateUserView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
 
+
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
     serializer_class = LoginSerializer
@@ -126,30 +118,58 @@ class LoginAPIView(APIView):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
+        
         refresh = RefreshToken.for_user(user)
-        access = AccessToken.for_user(user)
+        access = refresh.access_token 
+        
         is_admin = user.is_superuser  
-        return Response({
+
+        response = Response({
             'user_id': user.id,
-            'access': str(access),
-            'refresh': str(refresh),
-            'is_admin': is_admin  
+            'is_admin': is_admin,
+            'message': 'Login successful!'
         }, status=status.HTTP_200_OK)
+
+        response.set_cookie(
+            key="access_token",
+            value=str(access),
+            httponly=True,  # Prevents JavaScript access
+            secure=True,  # Only send over HTTPS
+            samesite="Lax",
+            max_age=300  # 5 minutes expiry
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=str(refresh),
+            httponly=True,
+            secure=True,
+            samesite="Lax",
+            max_age=86400  # 1 day expiry
+        )
+
+        return response
+
+
+
 
 class APILogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        if self.request.data.get('all'):
-            tokens = OutstandingToken.objects.filter(user=request.user)
-            for token in tokens:
-                _, _ = BlacklistedToken.objects.get_or_create(token=token)
-            return Response({"status": "OK, goodbye, all refresh tokens blacklisted"})
-        else:
-            refresh_token = self.request.data.get('refresh_token')
-            token = RefreshToken(token=refresh_token)
-            token.blacklist()
-            return Response({"status": "OK, goodbye"})
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()  # Blacklist the token
+            except Exception:
+                return Response({"error": "Invalid refresh token"}, status=400)
+
+        response = Response({"message": "Logged out successfully!"})
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        return response
+
 
 class GetUserFromToken(APIView):
     def post(self, request):
